@@ -2,16 +2,21 @@
 
 readonly script_dir=$(cd "$(dirname "$0")" && pwd) #このスクリプトが存在するディレクトリのパス
 readonly EXCECUTE_FILE=$script_dir/../main.py      #実行ファイル
-readonly OUTPUT_FILE=$script_dir/.log              #ログファイル
+readonly OUTPUT_FILE=$script_dir/.log              #ログファイル（実行結果ファイル)
+readonly OUTPUT_SCORES=$script_dir/.scores         #スコア結果ファイル
 
-columns=("TEST_ID" "SCORE")                        #結果の表示項目
+#テスト用に実行ファイルをコピーする
+cp $EXCECUTE_FILE $script_dir/.test.py 
+
+columns=("TEST_ID" "SCORE" "PRE" "CHANGE")                        #結果の表示項目
 column_count=${#columns[@]}
 
 debug_mode=false
 debug_test_id=-1
 run_tests_mode=false
 TEST_COUNT=-1 # テストケース数
-while getopts "d:r:" opt; do
+save_result=false
+while getopts "d:r:s" opt; do
     case $opt in
         # デバッグモード
         d)
@@ -21,6 +26,9 @@ while getopts "d:r:" opt; do
         r)
             run_tests_mode=true
             TEST_COUNT=$OPTARG
+            ;;
+        s)
+            save_result=true
             ;;
     esac
 done
@@ -52,24 +60,61 @@ debug_test() {
 }
 
 run_tests() {
-    #テスト用に実行ファイルをコピーする
-    cp $EXCECUTE_FILE $script_dir/.test.py 
+
+    if [ "$save_result" = true ]; then
+        # スコアファイルに記録が残っている場合は、消去する
+        if [ -e $OUTPUT_SCORES ];then
+            eval cp /dev/null $OUTPUT_SCORES
+        fi
+    fi
+
     display_header
 
     total_score=0
+    pre_total_score=0
+    show_pre_average=true
 
     for ((test_index = 0; test_index < $TEST_COUNT; test_index++)); do 
         test_number=$(printf "%04d\n" "${test_index}") 
         test_data_file_name=$script_dir/../in/$test_number.txt
         python3 $script_dir/.test.py < $test_data_file_name > $OUTPUT_FILE
         score=$(python3 $script_dir/score.py $test_data_file_name $OUTPUT_FILE)
+        if [ "$save_result" = true ]; then
+            echo "$test_number $score " >> $OUTPUT_SCORES
+        fi
+
         ((total_score += score))
-        display_row_items $test_number $score
+
+        pre_score=$(awk -v target="$test_number" '$1 == target {print $2}' "$OUTPUT_SCORES")
+
+        if [ -z "$pre_score" ]; then
+            pre_score="No Data"
+            show_pre_average=false
+            change="No Data"
+        else
+            ((pre_total_score += pre_score))
+            if [ $score -eq $pre_score ]; then
+                change="→"
+            elif [ $score -gt $pre_score ]; then
+                change="↑"
+            else
+                change="↓"
+            fi
+        fi
+
+        display_row_items $test_number $score $pre_score $change
     done
 
     display_horizontal_line
     average=$((total_score / $TEST_COUNT))
-    display_row_items AVERAGE $average
+
+    if [ "$show_pre_average" = true ]; then
+        pre_average=$((pre_total_score / $TEST_COUNT))
+    else 
+        pre_average="No Data"
+    fi
+    display_row_items AVERAGE $average $pre_average
+
 
     display_horizontal_line
 }
