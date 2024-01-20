@@ -110,10 +110,18 @@ run_tests() {
 
     if [ "$show_pre_average" = true ]; then
         pre_average=$((pre_total_score / $TEST_COUNT))
+        if [ $average -eq $pre_average ]; then
+            change="→"
+        elif [ $average -gt $pre_average ]; then
+            change="↑"
+        else
+            change="↓"
+        fi
     else 
         pre_average="No Data"
+        change="No Data"
     fi
-    display_row_items AVERAGE $average $pre_average
+    display_row_items AVERAGE $average $pre_average $change
 
 
     display_horizontal_line
