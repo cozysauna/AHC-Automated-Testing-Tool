@@ -16,6 +16,7 @@ debug_test_id=-1
 run_tests_mode=false
 TEST_COUNT=-1 # テストケース数
 save_result=false
+NO_DATA="N/A"
 while getopts "d:r:s" opt; do
     case $opt in
         # デバッグモード
@@ -59,6 +60,18 @@ debug_test() {
     python3 $script_dir/.test.py < $debug_test_data_file_name
 }
 
+get_change() {
+    score=$1
+    pre_score=$2
+    if [ $score -eq $pre_score ]; then
+        echo "→"
+    elif [ $score -gt $pre_score ]; then
+        echo "↑"
+    else
+        echo "↓"
+    fi
+}
+
 run_tests() {
 
     if [ "$save_result" = true ]; then
@@ -88,41 +101,28 @@ run_tests() {
         pre_score=$(awk -v target="$test_number" '$1 == target {print $2}' "$OUTPUT_SCORES")
 
         if [ -z "$pre_score" ]; then
-            pre_score="No Data"
+            pre_score=$NO_DATA
             show_pre_average=false
-            change="No Data"
+            change=$NO_DATA
         else
             ((pre_total_score += pre_score))
-            if [ $score -eq $pre_score ]; then
-                change="→"
-            elif [ $score -gt $pre_score ]; then
-                change="↑"
-            else
-                change="↓"
-            fi
+            change=`get_change $score $pre_score`
         fi
 
         display_row_items $test_number $score $pre_score $change
     done
 
     display_horizontal_line
-    average=$((total_score / $TEST_COUNT))
+    average=$(($total_score / $TEST_COUNT))
 
     if [ "$show_pre_average" = true ]; then
-        pre_average=$((pre_total_score / $TEST_COUNT))
-        if [ $average -eq $pre_average ]; then
-            change="→"
-        elif [ $average -gt $pre_average ]; then
-            change="↑"
-        else
-            change="↓"
-        fi
+        pre_average=$(($pre_total_score / $TEST_COUNT))
+        change=`get_change $average $pre_average`
     else 
-        pre_average="No Data"
-        change="No Data"
+        pre_average=$NO_DATA
+        change=$NO_DATA
     fi
     display_row_items AVERAGE $average $pre_average $change
-
 
     display_horizontal_line
 }
